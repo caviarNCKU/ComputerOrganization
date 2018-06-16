@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#define MAX_CACHE 500000
+#define MAX_CACHE 50000
 int main(int argc, char *argv[]){
 	FILE *f,*f2;
 	char line[1024];
@@ -10,20 +10,23 @@ int main(int argc, char *argv[]){
 	int block_num, tag, temp;
 	int count = 0, index = 0, byte_offset = 0;
 	int i,j,cache_index = 0,cache_tag = 0,cache_offset = 0,line_num = 1;
-	int cache_miss[MAX_CACHE];
-	//int *cache_miss;
+	//int cache_miss[MAX_CACHE];
+
+	int hit_flag = 0;
+	int tag3_count = 0;
+
 	double miss_rate;
 	typedef struct cache {
 		int valid;
 		int tag;
+		int tag3[10];
 		int data;
 	} CACHE;	
 
 	CACHE cache_data[MAX_CACHE];
 	//CACHE *cache_data;
-	//cache_data = (CACHE*)malloc(line_num*sizeof(CACHE));
-	//cache_miss = (int*)malloc(line_num*sizeof(int));
-
+	//cache_data = (CACHE*)malloc(cache_index*sizeof(CACHE));
+	//cache_data = (CACHE*)calloc(cache_index,sizeof(CACHE));
 	f  = fopen(argv[1],"r");
 	f2 = fopen(argv[2],"w");
 
@@ -55,7 +58,22 @@ int main(int argc, char *argv[]){
 	}
 	block_size = temp;
 	tag = 32 - index - byte_offset;
+	/*count total address to allocate memory*/
+	while(fgets(line, sizeof(line), f)){
+		line_num ++;
+	}
+	int *cache_miss = (int*)malloc(line_num*sizeof(int));
+	//cache_data = (CACHE*)calloc(line_num,sizeof(CACHE));
+	fseek(f,0,SEEK_SET);
+	count = 0;
 
+	while(fgets(line,sizeof(line),f)){
+		if(count == 3)
+			break;
+		count++;
+	}
+
+	int line_count = 1;
 	long int x;
 	int binaryNum[32];
 	int digit;
@@ -87,48 +105,60 @@ int main(int argc, char *argv[]){
 				cache_offset = cache_offset + (int)pow(2,j);
 			}
 		}
-		/*Associative*/
-		if(associate == 1){
-			printf("1\n");
+
+
+		/*associative*/
+		/*direct-mapped: Only FIFO*/
+		if(associate == 0){
 			if(cache_data[cache_index].valid != 1){
 				cache_data[cache_index].valid = 1;
 				cache_data[cache_index].tag = tag;
-				cache_miss[line_num] = 1;
+				cache_miss[line_count] = 1;
 			}
 			if(cache_data[cache_index].tag != tag){
-				cache_miss[line_num] = 1;
+				cache_miss[line_count] = 1;
+				cache_data[cache_index].tag = tag;
 			}		
 		}
-		else if(associate == 2){
-			printf("2\n");
+		/*4-way set associative: FIFO & LRU*/
+		else if(associate == 1){
 			if(cache_data[cache_index].valid != 1){
 				cache_data[cache_index].valid = 1;
 				cache_data[cache_index].tag = tag;
-				cache_miss[line_num] = 1;
+				cache_miss[line_count] = 1;
 			}
 			if(cache_data[cache_index].tag != tag){
-				cache_miss[line_num] = 1;
+				cache_miss[line_count] = 1;
 			}	
 		}
-		else if(associate == 3){
-			printf("3\n");
+		/*fully associative: No replacement policy*/
+		else{
 			if(cache_data[cache_index].valid != 1){
 				cache_data[cache_index].valid = 1;
-				cache_data[cache_index].tag = tag;
-				cache_miss[line_num] = 1;
+				cache_data[cache_index].tag3[tag3_count] = tag;
+				cache_miss[line_count] = 1;
+				++tag3_count;
 			}
-			if(cache_data[cache_index].tag != tag){
-				cache_miss[line_num] = 1;
-			}	
+			else{
+				for(i = 0; i < MAX_CACHE; i++){
+					if(cache_data[cache_index].tag3[i] == tag)
+						hit_flag = 1;
+				}
+				if(hit_flag != 1){
+					cache_miss[line_count] = 1;
+					cache_data[cache_index].tag3[tag3_count] = tag;
+					++tag3_count;
+				}
+			}
+			hit_flag = 0;
 		}
-		
-		line_num ++;
-	}
+		++line_count;
+	}	
 
 	fprintf(f2,"Hit instructions:");
 	int temp2  = 0, total_miss = 0;
 	for(i = 1 ; i < line_num; i++){
-		if(cache_miss[i] != 1){
+		if(cache_miss[i] == 0){
 			if(temp2 == 0){
 				fprintf(f2,"%d",i);
 				temp2 = 1;
@@ -155,7 +185,7 @@ int main(int argc, char *argv[]){
 	miss_rate = (double)total_miss / (double)(line_num - 1);
 	fprintf(f2,"\nMiss rate: %f\n", miss_rate);
 	//free(cache_data);
-	//free(cache_miss);
+	free(cache_miss);
 	fclose(f);
 	fclose(f2);
 }
