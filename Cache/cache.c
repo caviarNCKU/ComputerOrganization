@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#define MAX_CACHE 50000
+#define MAX_CACHE 1000000
 int main(int argc, char *argv[]){
 	FILE *f,*f2;
 	char line[1024];
@@ -10,7 +10,6 @@ int main(int argc, char *argv[]){
 	int block_num, tag, temp;
 	int count = 0, index = 0, byte_offset = 0;
 	int i,j,cache_index = 0,cache_tag = 0,cache_offset = 0,line_num = 1;
-	//int cache_miss[MAX_CACHE];
 
 	int hit_flag = 0;
 	int tag3_count = 0;
@@ -19,14 +18,14 @@ int main(int argc, char *argv[]){
 	typedef struct cache {
 		int valid;
 		int tag;
-		int tag3[10];
+		int tag3[500];
+		//int *tag3;
 		int data;
 	} CACHE;	
 
-	CACHE cache_data[MAX_CACHE];
-	//CACHE *cache_data;
-	//cache_data = (CACHE*)malloc(cache_index*sizeof(CACHE));
-	//cache_data = (CACHE*)calloc(cache_index,sizeof(CACHE));
+	CACHE *cache_data;
+	cache_data = (CACHE*)malloc(MAX_CACHE*sizeof(CACHE));
+	//cache_data->tag3 = malloc(MAX_CACHE*sizeof(cache_data->tag3));
 	f  = fopen(argv[1],"r");
 	f2 = fopen(argv[2],"w");
 
@@ -63,10 +62,8 @@ int main(int argc, char *argv[]){
 		line_num ++;
 	}
 	int *cache_miss = (int*)malloc(line_num*sizeof(int));
-	//cache_data = (CACHE*)calloc(line_num,sizeof(CACHE));
 	fseek(f,0,SEEK_SET);
 	count = 0;
-
 	while(fgets(line,sizeof(line),f)){
 		if(count == 3)
 			break;
@@ -106,7 +103,6 @@ int main(int argc, char *argv[]){
 			}
 		}
 
-
 		/*associative*/
 		/*direct-mapped: Only FIFO*/
 		if(associate == 0){
@@ -140,7 +136,7 @@ int main(int argc, char *argv[]){
 				++tag3_count;
 			}
 			else{
-				for(i = 0; i < MAX_CACHE; i++){
+				for(i = 0; i < tag3_count; i++){
 					if(cache_data[cache_index].tag3[i] == tag)
 						hit_flag = 1;
 				}
@@ -184,7 +180,8 @@ int main(int argc, char *argv[]){
 	}
 	miss_rate = (double)total_miss / (double)(line_num - 1);
 	fprintf(f2,"\nMiss rate: %f\n", miss_rate);
-	//free(cache_data);
+
+	free(cache_data);
 	free(cache_miss);
 	fclose(f);
 	fclose(f2);
